@@ -7,6 +7,7 @@ from omegaconf import DictConfig, OmegaConf
 # This automatically reads in the configuration
 @hydra.main(config_name='config')
 def go(config: DictConfig):
+
     # Setup the wandb experiment. All runs will be grouped under this name
     os.environ["WANDB_PROJECT"] = config["main"]["project_name"]
     os.environ["WANDB_RUN_GROUP"] = config["main"]["experiment_name"]
@@ -19,10 +20,12 @@ def go(config: DictConfig):
         # This was passed on the command line as a comma-separated list of steps
         steps_to_execute = config["main"]["execute_steps"].split(",")
     else:
-        steps_to_execute = config["main"]["execute_steps"]
+
+        steps_to_execute = list(config["main"]["execute_steps"])
 
     # Download step
     if "download" in steps_to_execute:
+
         _ = mlflow.run(
             os.path.join(root_path, "download"),
             "main",
@@ -42,7 +45,7 @@ def go(config: DictConfig):
                 "input_artifact": "raw_data.parquet:latest",
                 "artifact_name": "preprocessed_data.csv",
                 "artifact_type": "preprocessed_data",
-                "artifact_description": "Preprocessed data"
+                "artifact_description": "Data with preprocessing applied"
             },
         )
 
@@ -58,6 +61,7 @@ def go(config: DictConfig):
         )
 
     if "segregate" in steps_to_execute:
+
         _ = mlflow.run(
             os.path.join(root_path, "segregate"),
             "main",
@@ -66,7 +70,6 @@ def go(config: DictConfig):
                 "artifact_root": "data",
                 "artifact_type": "segregated_data",
                 "test_size": config["data"]["test_size"],
-                "random_state": config["random_forest_pipeline"]["random_state"],
                 "stratify": config["data"]["stratify"]
             },
         )
@@ -85,18 +88,19 @@ def go(config: DictConfig):
                 "train_data": "data_train.csv:latest",
                 "model_config": model_config,
                 "export_artifact": config["random_forest_pipeline"]["export_artifact"],
-                "random_seed": config["data"]["test_size"],
-                "val_size": config["data"]["val_size"],
+                "random_seed": config["main"]["random_seed"],
+                "val_size": config["data"]["test_size"],
                 "stratify": config["data"]["stratify"]
             },
         )
 
     if "evaluate" in steps_to_execute:
+
         _ = mlflow.run(
             os.path.join(root_path, "evaluate"),
             "main",
             parameters={
-                "model_export": f"f{config['random_forest_pipeline']['export_artifact']['model_export']}",
+                "model_export": f"{config['random_forest_pipeline']['export_artifact']}:latest",
                 "test_data": "data_test.csv:latest"
             },
         )
